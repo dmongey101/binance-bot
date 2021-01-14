@@ -11,6 +11,9 @@ from binance.enums import *
 import requests
 import urllib3
 from dotenv import load_dotenv
+import time
+
+starttime = time.time()
 
 load_dotenv()
 
@@ -23,7 +26,7 @@ client = Client(api_key, api_secret)
 
 # here enter the id of your google sheet
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
-SAMPLE_RANGE_NAME = 'Dashboard!A1:L'
+SAMPLE_RANGE_NAME = 'BTC!B3'
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
@@ -54,7 +57,20 @@ def main():
 
     if not values_input and not values_expansion:
         print('No data found.')
+    
+    return values_input[0][0]
 
-main()
+def btc_sell_order(current_btc_risk):
+    if current_btc_risk > 0.857:
+        client.order_market_sell(
+            symbol='BTCUSD',
+            quantity=0.01
+        )
+        
+while True:
+    btc_risk = main()
+    print(btc_risk)
+    # btc_sell_order(int(float(btc_risk)))
+    time.sleep(5.0 - ((time.time() - starttime) % 5.0))
 
-print(values_input)
+# print(values_input)
