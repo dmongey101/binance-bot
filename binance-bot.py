@@ -13,7 +13,6 @@ from binance.client import Client
 from binance.enums import *
 from dotenv import load_dotenv
 
-
 starttime = time.time()
 load_dotenv()
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -22,6 +21,7 @@ api_key = os.getenv("BINANCE_API_KEY")
 api_secret = os.getenv("BINANCE_API_SECRET")
 
 client = Client(api_key, api_secret)
+client.API_URL = 'https://testnet.binance.vision/api'
 
 # here enter the id of your google sheet
 risk_strategy_sheet_id = os.getenv("RISK_STRATEGY_SHEET_ID")
@@ -29,6 +29,8 @@ risk_strategy_sheet_range = 'BTC!A2:G'
 
 binance_bot_sheet_id = os.getenv('BINANCE_BOT_SHEET_ID')
 binance_bot_sheet_range = 'Binance-bot!A3'
+
+risk_cool_off_value = float(input('What is the current risk?'))
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
@@ -40,7 +42,7 @@ def get_current_price(from_currency, to_currency):
     response = requests.get(url).json()
     return response.get('Realtime Currency Exchange Rate', {}).get('5. Exchange Rate')
 
-def main():
+def get_current_risks():
     global data, service
     creds = None
     if os.path.exists('token.pickle'):
@@ -64,9 +66,7 @@ def main():
     #                             range=risk_strategy_sheet_range).execute()
     # data_to_copy = result_input.get('values', [])
 
-    current_btc_price = get_current_price("BTC", "USD")
-    print(current_btc_price)
-    
+    current_btc_price = get_current_price("BTC", "USD")    
     values = [
         [
             current_btc_price
@@ -79,7 +79,7 @@ def main():
     result = service.spreadsheets().values().update(
         spreadsheetId=binance_bot_sheet_id, range=binance_bot_sheet_range,
         valueInputOption='USER_ENTERED', body=body).execute()
-    print('{0} cell updated.'.format(result.get('updatedCells')))
+    print('{0} cell updated with price {1}'.format(result.get('updatedCells'), current_btc_price))
 
     sheet = service.spreadsheets()
     result_input = sheet.values().get(spreadsheetId=binance_bot_sheet_id,
@@ -92,23 +92,41 @@ def main():
     return btc_risk[0][0]
 
 def btc_sell_order(current_btc_risk):
-    print(current_btc_risk)
-    if current_btc_risk > 0.817:
-        client.order_market_sell(
-            symbol='BTCUSDT',
-            quantity=0.01
-        )
-        print('Sold 0.01 BTC')
-        btc_balance = client.get_asset_balance(asset='BTC')
-        print('Your BTC balance is now {}'.format(btc_balance))
-        return True
-    return False
-    
-while True:
-    btc_risk = main()
-    stop = btc_sell_order(float(btc_risk))
-    if stop:
-        break
-    time.sleep(10.0 - ((time.time() - starttime) % 10.0))
+    usdt_balance = client.get_asset_balance(asset='USDT')
+    print('Your USDT balance was {} USDT'.format(usdt_balance.get('free')))
+    order = client.order_market_sell(
+        symbol='BTCUSDT',
+        quantity=0.1)
+    print(order)
+    usdt_balance = client.get_asset_balance(asset='USDT')
+    print('Your USDT balance is now {} USDT'.format(usdt_balance.get('free')))
+    print('Sold 0.01 BTC')
+    btc_balance = client.get_asset_balance(asset='BTC')
+    print('Your BTC balance is now {} BTC'.format(btc_balance.get('free')))
+    risk_cool_off_value = btc_risk
 
-# print(values_input)
+def btc_buy_order(current_btc_risk):
+    usdt_balance = client.get_asset_balance(asset='USDT')
+    print('Your USDT balance was {} USDT'.format(usdt_balance.get('free')))
+    order = client.order_market_buy(
+        symbol='BTCUSDT',
+        quantity=0.1)
+    print(order)
+    usdt_balance = client.get_asset_balance(asset='USDT')
+    print('Your USDT balance is now {} USDT'.format(usdt_balance.get('free')))
+    print('Sold 0.01 BTC')
+    btc_balance = client.get_asset_balance(asset='BTC')
+    print('Your BTC balance is now {} BTC'.format(btc_balance.get('free')))
+    risk_cool_off_value = btc_risk
+
+while True:
+    print('Last buy/sell risk: {}'.format(risk_cool_off_value))
+    btc_risk = get_current_risks()
+    print('Current BTC risk: {}'.format(btc_risk))
+    if float(btc_risk) - risk_cool_off_value >= 0.025:
+        btc_sell_order(float(btc_risk))
+    if risk_cool_off_value - float(btc_risk) >= 0.025:
+        btc_buy_order(float(btc_risk))
+
+    # I think the alpha api gets updated every minute so I'll probably change this
+    time.sleep(30.0 - ((time.time() - starttime) % 30.0))
