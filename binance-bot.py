@@ -30,9 +30,8 @@ risk_strategy_sheet_range = 'BTC!A2:G'
 
 binance_bot_sheet_id = os.getenv('BINANCE_BOT_SHEET_ID')
 binance_bot_sheet_range = 'Binance-bot!A3'
-orders = client.get_open_orders(symbol='BTCUSDT')
-print(orders)
-risk_cool_off_value = float(input('What is the current risk?'))
+
+risk_cool_off_value = 0.775
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
@@ -104,17 +103,33 @@ def btc_sell_order(current_btc_risk):
     slo_div = 0.0753 + 0.0897*math.log(current_btc_risk)
     slo_btc_amount = float(format(btc_holding * slo_div, ".5f"))
     slo_price = math.floor(current_btc_price-500)
-    order = client.create_order(
+    print('Looking for previous orders')
+    old_order = client.get_open_orders(symbol='BTCUSDT')
+    if old_order:
+        old_order_id = old_order[0].get('orderId')
+        print('Order found with id {}'.format(old_order_id))
+        result = client.cancel_order(
+            symbol='BTCUSDT',
+            orderId=str(old_order_id)
+        )
+        print('Cancelled order with id {}'.format(old_order_id))
+    else:
+        print('No order found')
+    print('Creating new order')
+    print('Quantity: {} BTC'.format(slo_btc_amount))
+    print('Sell Price: ${}'.format(slo_price))
+    new_order = client.create_order(
         symbol='BTCUSDT',
         side=SIDE_SELL,
         type=ORDER_TYPE_LIMIT,
         timeInForce=TIME_IN_FORCE_GTC,
         quantity=slo_btc_amount,
-        price=slo_price)
-    print(order)
+        price=slo_price
+    )
     print('Sell order created')
     global risk_cool_off_value
     risk_cool_off_value += 0.025
+    risk_cool_off_value = round(risk_cool_off_value, 3)
     print('New sell order risk is set to {}'.format(risk_cool_off_value))
     
     
@@ -132,15 +147,16 @@ def btc_buy_order():
     print('Your BTC balance is now {} BTC'.format(btc_balance.get('free')))
     global risk_cool_off_value
     risk_cool_off_value += 0.025
+    risk_cool_off_value = round(risk_cool_off_value, 3)
     print('New sell order risk is set to {}'.format(risk_cool_off_value))
 
-# while True:
-#     current_btc_risk = get_current_risks()
-#     print('Current BTC risk: {}'.format(current_btc_risk))
-#     if current_btc_risk > risk_cool_off_value:
-#         btc_sell_order(current_btc_risk)
-#     if current_btc_risk <= 0.5:
-#         btc_buy_order()
-#     print('----------------------------')
-#     # I think the alpha api gets updated every minute so I'll probably change this
-#     time.sleep(60.0 - ((time.time() - starttime) % 60.0))
+while True:
+    current_btc_risk = get_current_risks()
+    print('Current BTC risk: {}'.format(current_btc_risk))
+    if current_btc_risk > risk_cool_off_value:
+        btc_sell_order(current_btc_risk)
+    if current_btc_risk <= 0.5:
+        btc_buy_order()
+    print('----------------------------')
+    # I think the alpha api gets updated every minute so I'll probably change this
+    time.sleep(60.0 - ((time.time() - starttime) % 60.0))

@@ -70,6 +70,7 @@ pyparsing==2.4.7
 pyrsistent==0.17.3
 python-binance==0.7.9
 python-dateutil==2.8.1
+python-dotenv==0.15.0
 pytz==2020.5
 pyzmq==20.0.0
 qtconsole==5.0.1
