@@ -1,5 +1,6 @@
 import os
 import os.path
+import math
 import time
 import json
 import pickle
@@ -29,7 +30,8 @@ risk_strategy_sheet_range = 'BTC!A2:G'
 
 binance_bot_sheet_id = os.getenv('BINANCE_BOT_SHEET_ID')
 binance_bot_sheet_range = 'Binance-bot!A3'
-
+orders = client.get_open_orders(symbol='BTCUSDT')
+print(orders)
 risk_cool_off_value = float(input('What is the current risk?'))
 
 # If modifying these scopes, delete the file token.pickle.
@@ -40,10 +42,10 @@ def get_current_price(from_currency, to_currency):
     alpha_api_key = os.getenv('ALPHA_API_KEY')
     url = alpha_base_url + 'query?function=CURRENCY_EXCHANGE_RATE&from_currency=' + from_currency + '&to_currency=' + to_currency + '&apikey=' + alpha_api_key
     response = requests.get(url).json()
-    return response.get('Realtime Currency Exchange Rate', {}).get('5. Exchange Rate')
+    return response
 
 def get_current_risks():
-    global data, service
+    global data, service, current_btc_price
     creds = None
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
@@ -66,7 +68,13 @@ def get_current_risks():
     #                             range=risk_strategy_sheet_range).execute()
     # data_to_copy = result_input.get('values', [])
 
-    current_btc_price = get_current_price("BTC", "USD")    
+    btc_price_json = get_current_price("BTC", "USD")
+    if btc_price_json is None:
+        btc_price_json = get_current_price("BTC", "USD")
+    
+    current_btc_price = float(btc_price_json.get('Realtime Currency Exchange Rate', {}).get('5. Exchange Rate'))
+    current_btc_price_time = btc_price_json.get('Realtime Currency Exchange Rate', {}).get('6. Last Refreshed') 
+
     values = [
         [
             current_btc_price
@@ -79,7 +87,7 @@ def get_current_risks():
     result = service.spreadsheets().values().update(
         spreadsheetId=binance_bot_sheet_id, range=binance_bot_sheet_range,
         valueInputOption='USER_ENTERED', body=body).execute()
-    print('{0} cell updated with price {1}'.format(result.get('updatedCells'), current_btc_price))
+    print('{0} cell updated with price {1} at {2}'.format(result.get('updatedCells'), "{:.2f}".format(float(current_btc_price)), current_btc_price_time))
 
     sheet = service.spreadsheets()
     result_input = sheet.values().get(spreadsheetId=binance_bot_sheet_id,
@@ -89,44 +97,50 @@ def get_current_risks():
     if not result_input and not values_expansion:
         print('No data found.')
 
-    return btc_risk[0][0]
+    return float(btc_risk[0][0])
 
 def btc_sell_order(current_btc_risk):
-    usdt_balance = client.get_asset_balance(asset='USDT')
-    print('Your USDT balance was {} USDT'.format(usdt_balance.get('free')))
-    order = client.order_market_sell(
+    btc_holding = float(client.get_asset_balance(asset='BTC').get('free'))
+    slo_div = 0.0753 + 0.0897*math.log(current_btc_risk)
+    slo_btc_amount = float(format(btc_holding * slo_div, ".5f"))
+    slo_price = math.floor(current_btc_price-500)
+    order = client.create_order(
         symbol='BTCUSDT',
-        quantity=0.1)
+        side=SIDE_SELL,
+        type=ORDER_TYPE_LIMIT,
+        timeInForce=TIME_IN_FORCE_GTC,
+        quantity=slo_btc_amount,
+        price=slo_price)
     print(order)
-    usdt_balance = client.get_asset_balance(asset='USDT')
-    print('Your USDT balance is now {} USDT'.format(usdt_balance.get('free')))
-    print('Sold 0.01 BTC')
-    btc_balance = client.get_asset_balance(asset='BTC')
-    print('Your BTC balance is now {} BTC'.format(btc_balance.get('free')))
-    risk_cool_off_value = btc_risk
-
-def btc_buy_order(current_btc_risk):
+    print('Sell order created')
+    global risk_cool_off_value
+    risk_cool_off_value += 0.025
+    print('New sell order risk is set to {}'.format(risk_cool_off_value))
+    
+    
+def btc_buy_order():
     usdt_balance = client.get_asset_balance(asset='USDT')
     print('Your USDT balance was {} USDT'.format(usdt_balance.get('free')))
     order = client.order_market_buy(
         symbol='BTCUSDT',
-        quantity=0.1)
+        quantity=0.3)
     print(order)
     usdt_balance = client.get_asset_balance(asset='USDT')
     print('Your USDT balance is now {} USDT'.format(usdt_balance.get('free')))
-    print('Sold 0.01 BTC')
+    print('You bought 0.3 BTC')
     btc_balance = client.get_asset_balance(asset='BTC')
     print('Your BTC balance is now {} BTC'.format(btc_balance.get('free')))
-    risk_cool_off_value = btc_risk
+    global risk_cool_off_value
+    risk_cool_off_value += 0.025
+    print('New sell order risk is set to {}'.format(risk_cool_off_value))
 
-while True:
-    print('Last buy/sell risk: {}'.format(risk_cool_off_value))
-    btc_risk = get_current_risks()
-    print('Current BTC risk: {}'.format(btc_risk))
-    if float(btc_risk) - risk_cool_off_value >= 0.025:
-        btc_sell_order(float(btc_risk))
-    if risk_cool_off_value - float(btc_risk) >= 0.025:
-        btc_buy_order(float(btc_risk))
-
-    # I think the alpha api gets updated every minute so I'll probably change this
-    time.sleep(30.0 - ((time.time() - starttime) % 30.0))
+# while True:
+#     current_btc_risk = get_current_risks()
+#     print('Current BTC risk: {}'.format(current_btc_risk))
+#     if current_btc_risk > risk_cool_off_value:
+#         btc_sell_order(current_btc_risk)
+#     if current_btc_risk <= 0.5:
+#         btc_buy_order()
+#     print('----------------------------')
+#     # I think the alpha api gets updated every minute so I'll probably change this
+#     time.sleep(60.0 - ((time.time() - starttime) % 60.0))
