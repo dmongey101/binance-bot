@@ -99,6 +99,7 @@ def get_current_risks():
     return float(btc_risk[0][0])
 
 def btc_sell_order(current_btc_risk):
+    # this needs to be the initial amount of btc
     btc_holding = float(client.get_asset_balance(asset='BTC').get('free'))
     slo_div = 0.0753 + 0.0897*math.log(current_btc_risk)
     slo_btc_amount = float(format(btc_holding * slo_div, ".5f"))
@@ -152,8 +153,10 @@ def btc_buy_order():
 
 while True:
     current_btc_risk = get_current_risks()
+    if risk_cool_off_value - current_btc_risk >= 0.05:
+        risk_cool_off_value -= 0.025
     print('Current BTC risk: {}'.format(current_btc_risk))
-    if current_btc_risk > risk_cool_off_value:
+    if current_btc_risk >= risk_cool_off_value:
         btc_sell_order(current_btc_risk)
     if current_btc_risk <= 0.5:
         btc_buy_order()
