@@ -34,7 +34,7 @@ risk_strategy_sheet_range = 'BTC!A2:G'
 binance_bot_sheet_id = os.getenv('BINANCE_BOT_SHEET_ID')
 binance_bot_sheet_range = 'Binance-bot!A3'
 
-risk_cool_off_value = 0.85
+risk_cool_off_value = 0.8
 
 servive = None
 
@@ -153,7 +153,6 @@ def btc_buy_order():
 
 # schedule.every().monday.at("09:00").do(update_sheet_job)
 schedule.every().day.at("07:00").do(update_sheet_job)
-
 
 while True:
     schedule.run_pending()
