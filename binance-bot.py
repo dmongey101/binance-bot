@@ -2,6 +2,7 @@ import os
 import os.path
 import math
 import time
+import schedule
 import json
 import pickle
 import pandas as pd
@@ -14,6 +15,7 @@ from binance.client import Client
 from binance.enums import *
 from dotenv import load_dotenv
 from datetime import date
+from jobs import update_sheet_job
 
 starttime = time.time()
 load_dotenv()
@@ -34,7 +36,7 @@ binance_bot_sheet_range = 'Binance-bot!A3'
 
 risk_cool_off_value = 0.85
 
-stored_risk_sheet = []
+servive = None
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
@@ -47,7 +49,7 @@ def get_current_price(from_currency, to_currency):
     return response
 
 def get_current_risks():
-    global data, service, current_btc_price, stored_risk_sheet
+    global data, service, current_btc_price
     creds = None
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
@@ -70,76 +72,6 @@ def get_current_risks():
     
     current_btc_price = float(btc_price_json.get('Realtime Currency Exchange Rate', {}).get('5. Exchange Rate'))
     current_btc_price_time = btc_price_json.get('Realtime Currency Exchange Rate', {}).get('6. Last Refreshed')
-    
-    # getting btc risk sheet to check for changes
-    range_names = [
-        'BTC!A4:B',
-        'BTC!D2:E'
-    ]
-    result = service.spreadsheets().values().batchGet(
-        spreadsheetId=risk_strategy_sheet_id, ranges=range_names).execute()
-    current_risk_sheet = result.get('valueRanges', [])
-    print('{0} ranges retrieved.'.format(len(current_risk_sheet)))
-
-    #  if there are changes then archive the old sheet and update the current
-    if current_risk_sheet != stored_risk_sheet:
-        stored_risk_sheet = current_risk_sheet
-
-        today = date.today().strftime("%b-%d-%Y")
-        title = 'BTC ' + today
-        body = {
-        'requests': [{
-            'addSheet': {
-                'properties': {
-                    'title': title,
-                }
-            }
-        }]
-        }
-
-        # archive
-        result = service.spreadsheets().batchUpdate(
-            spreadsheetId=binance_bot_sheet_id,
-            body=body).execute()
-
-        data = [
-            {
-                'range': title + '!A4:B',
-                'values': current_risk_sheet[0].get('values')
-            },
-            {
-                'range': title + '!D2:E',
-                'values': current_risk_sheet[1].get('values')
-            }
-        ]
-        print(data)
-        body = {
-            'valueInputOption': 'USER_ENTERED',
-            'data': data
-        }
-        result = service.spreadsheets().values().batchUpdate(
-            spreadsheetId=binance_bot_sheet_id, body=body).execute()
-        print('{0} cells updated.'.format(result.get('totalUpdatedCells')))
-
-        # update our current sheet
-        data = [
-            {
-                'range': 'Binance-bot!A4:B',
-                'values': current_risk_sheet[0].get('values')
-            },
-            {
-                'range': 'Binance-bot!D2:E',
-                'values': current_risk_sheet[1].get('values')
-            }
-        ]
-        body = {
-            'valueInputOption': 'USER_ENTERED',
-            'data': data
-        }
-        result = service.spreadsheets().values().batchUpdate(
-            spreadsheetId=binance_bot_sheet_id, body=body).execute()
-        print('{0} cells updated.'.format(result.get('totalUpdatedCells')))
-
        
     values = [
         [
@@ -219,7 +151,12 @@ def btc_buy_order():
     risk_cool_off_value = round(risk_cool_off_value, 3)
     print('New sell order risk is set to {}'.format(risk_cool_off_value))
 
+# schedule.every().monday.at("09:00").do(update_sheet_job)
+schedule.every().day.at("07:00").do(update_sheet_job)
+
+
 while True:
+    schedule.run_pending()
     current_btc_risk = get_current_risks()
     if risk_cool_off_value - current_btc_risk >= 0.05:
         risk_cool_off_value -= 0.025
