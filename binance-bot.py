@@ -13,7 +13,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow,Flow
 from google.auth.transport.requests import Request
 from dotenv import load_dotenv
 from datetime import date
-from jobs import update_sheet_job
+from jobs import update_sheet_job, send_daily_email
 from buy_and_sell import btc_sell_order, btc_buy_order
 
 starttime = time.time()
@@ -87,6 +87,7 @@ def get_current_risks(from_currency, to_currency):
 
 # schedule.every().monday.at("09:00").do(update_sheet_job)
 schedule.every().day.at("06:00").do(update_sheet_job, service)
+schedule.every().day.at("07:00").do(send_daily_email)
 
 while True:
     schedule.run_pending()
