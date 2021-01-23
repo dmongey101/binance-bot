@@ -136,7 +136,7 @@ def send_daily_email():
     context = ssl.create_default_context()
 
     sender_email = "binancebottest92@gmail.com"
-    receiver_email = "donalmongey@gmail.com"
+    receiver_emails = ["donalmongey@gmail.com", "gavinbmoore96@gmail.com"]
     message = MIMEMultipart("alternative")
     message["Subject"] = "Bot test"
     message["From"] = sender_email
@@ -149,7 +149,8 @@ def send_daily_email():
         print('Logging into email server')
         server.login(sender_email, gmail_password)
         print('Sending email')
-        server.sendmail(
-            sender_email, receiver_email, message.as_string()
+        for email_address in receiver_emails:
+            server.sendmail(
+            sender_email, email_address, message.as_string()
         )
-        print('Email sent')
+        print('Email sent to {0}'.format(email_address))

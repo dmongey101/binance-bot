@@ -14,7 +14,7 @@ from google.auth.transport.requests import Request
 from dotenv import load_dotenv
 from datetime import date
 from jobs import update_sheet_job, send_daily_email
-from buy_and_sell import btc_sell_order, btc_buy_order
+from buy_and_sell import sell_order, buy_order
 
 starttime = time.time()
 load_dotenv()
@@ -98,14 +98,15 @@ while True:
         risk_cool_off_btc_value -= 0.025
     print('Current BTC risk: {}'.format(current_btc_risk))
     if current_btc_risk >= risk_cool_off_btc_value:
-        risk_cool_off_btc_value = btc_sell_order(current_btc_risk, current_price, 'BTC', 'USDT', risk_cool_off_btc_value)
+        risk_cool_off_btc_value = sell_order(current_btc_risk, current_price, 'BTC', 'USDT', risk_cool_off_btc_value)
     if current_btc_risk <= 0.5:
-        btc_buy_order()
+        buy_order()
+
     if risk_cool_off_eth_value - current_eth_risk >= 0.05:
         risk_cool_off_eth_value -= 0.025
     print('Current ETH risk: {}'.format(current_eth_risk))
     if current_eth_risk >= risk_cool_off_eth_value:
-        risk_cool_off_eth_value = btc_sell_order(current_eth_risk, current_price, 'ETH', 'USDT', risk_cool_off_eth_value)
+        risk_cool_off_eth_value = sell_order(current_eth_risk, current_price, 'ETH', 'USDT', risk_cool_off_eth_value)
     print('----------------------------')
     # I think the alpha api gets updated every minute so I'll probably change this
     time.sleep(60.0 - ((time.time() - starttime) % 60.0))
