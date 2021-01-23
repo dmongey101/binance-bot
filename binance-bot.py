@@ -24,7 +24,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 risk_strategy_sheet_id = os.getenv("RISK_STRATEGY_SHEET_ID")
 binance_bot_sheet_id = os.getenv('BINANCE_BOT_SHEET_ID')
 
-risk_cool_off_value = 0.775
+risk_cool_off_btc_value = 0.775
+risk_cool_off_eth_value = 0.575
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
@@ -92,13 +93,19 @@ schedule.every().day.at("07:00").do(send_daily_email)
 while True:
     schedule.run_pending()
     current_btc_risk = get_current_risks('BTC', 'USD')
-    if risk_cool_off_value - current_btc_risk >= 0.05:
-        risk_cool_off_value -= 0.025
+    current_eth_risk = get_current_risks('ETH', 'USD')
+    if risk_cool_off_btc_value - current_btc_risk >= 0.05:
+        risk_cool_off_btc_value -= 0.025
     print('Current BTC risk: {}'.format(current_btc_risk))
-    if current_btc_risk >= risk_cool_off_value:
-        risk_cool_off_value = btc_sell_order(current_btc_risk, current_price, 'BTC', 'USDT', risk_cool_off_value)
+    if current_btc_risk >= risk_cool_off_btc_value:
+        risk_cool_off_btc_value = btc_sell_order(current_btc_risk, current_price, 'BTC', 'USDT', risk_cool_off_btc_value)
     if current_btc_risk <= 0.5:
         btc_buy_order()
+    if risk_cool_off_eth_value - current_eth_risk >= 0.05:
+        risk_cool_off_eth_value -= 0.025
+    print('Current ETH risk: {}'.format(current_eth_risk))
+    if current_eth_risk >= risk_cool_off_eth_value:
+        risk_cool_off_eth_value = btc_sell_order(current_eth_risk, current_price, 'ETH', 'USDT', risk_cool_off_eth_value)
     print('----------------------------')
     # I think the alpha api gets updated every minute so I'll probably change this
     time.sleep(60.0 - ((time.time() - starttime) % 60.0))
