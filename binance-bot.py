@@ -24,7 +24,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 risk_strategy_sheet_id = os.getenv("RISK_STRATEGY_SHEET_ID")
 binance_bot_sheet_id = os.getenv('BINANCE_BOT_SHEET_ID')
 
-risk_cool_off_btc_value = 0.775
+risk_cool_off_btc_value = 0.75
 risk_cool_off_eth_value = 0.575
 
 # If modifying these scopes, delete the file token.pickle.
@@ -55,12 +55,12 @@ def get_current_price(from_currency, to_currency):
 def get_current_risks(from_currency, to_currency):
     global current_price
 
-    btc_price_json = get_current_price(from_currency, to_currency)
-    if btc_price_json is None:
-        btc_price_json = get_current_price(from_currency, to_currency)
+    coin_price_json = get_current_price(from_currency, to_currency)
+    if coin_price_json is None:
+        coin_price_json = get_current_price(from_currency, to_currency)
     
-    current_price = float(btc_price_json.get('Realtime Currency Exchange Rate', {}).get('5. Exchange Rate'))
-    current_price_time = btc_price_json.get('Realtime Currency Exchange Rate', {}).get('6. Last Refreshed')   
+    current_price = float(coin_price_json.get('Realtime Currency Exchange Rate', {}).get('5. Exchange Rate'))
+    current_price_time = coin_price_json.get('Realtime Currency Exchange Rate', {}).get('6. Last Refreshed')   
     values = [
         [
             current_price
@@ -73,18 +73,18 @@ def get_current_risks(from_currency, to_currency):
     result = service.spreadsheets().values().update(
         spreadsheetId=binance_bot_sheet_id, range=from_currency+'Main!A3',
         valueInputOption='USER_ENTERED', body=body).execute()
-    print('{0} cell updated with price {1} at {2}'.format(result.get('updatedCells'), "{:.2f}".format(float(current_price)), current_price_time))
+    print('{0} cell updated with price {1}{2} at {3}'.format(result.get('updatedCells'), "{:.2f}".format(float(current_price)), from_currency, current_price_time))
 
     # getting current risk from sheet
     sheet = service.spreadsheets()
     result_input = sheet.values().get(spreadsheetId=binance_bot_sheet_id,
                                 range=from_currency+'Main!B3').execute()
-    btc_risk = result_input.get('values', [])
+    coin_risk = result_input.get('values', [])
 
     if not result_input and not values_expansion:
         print('No data found.')
 
-    return float(btc_risk[0][0])
+    return float(coin_risk[0][0])
 
 # schedule.every().monday.at("09:00").do(update_sheet_job)
 schedule.every().day.at("06:00").do(update_sheet_job, service)
@@ -93,7 +93,7 @@ schedule.every().day.at("07:00").do(send_daily_email)
 while True:
     schedule.run_pending()
     current_btc_risk = get_current_risks('BTC', 'USD')
-    current_eth_risk = get_current_risks('ETH', 'USD')
+    print(current_price)
     if risk_cool_off_btc_value - current_btc_risk >= 0.05:
         risk_cool_off_btc_value -= 0.025
     print('Current BTC risk: {}'.format(current_btc_risk))
@@ -101,7 +101,8 @@ while True:
         risk_cool_off_btc_value = sell_order(current_btc_risk, current_price, 'BTC', 'USDT', risk_cool_off_btc_value)
     if current_btc_risk <= 0.5:
         buy_order()
-
+    current_eth_risk = get_current_risks('ETH', 'USD')
+    print(current_price)
     if risk_cool_off_eth_value - current_eth_risk >= 0.05:
         risk_cool_off_eth_value -= 0.025
     print('Current ETH risk: {}'.format(current_eth_risk))

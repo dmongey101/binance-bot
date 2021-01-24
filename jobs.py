@@ -15,44 +15,52 @@ binance_bot_sheet_id = os.getenv('BINANCE_BOT_SHEET_ID')
 
 def update_sheet_job(service):
 
-    print('Getting data from BTC sheet')
-    result = service.spreadsheets().values().get(
-        spreadsheetId=risk_strategy_sheet_id, range='BTC!A1:E', valueRenderOption='FORMULA').execute()
-    current_risk_sheet = result.get('values', [])
-    print('{0} rows retrieved.'.format(len(current_risk_sheet)))
+    coins = ['BTC', 'ETH']
 
-    today = date.today().strftime("%b-%d-%Y")
-    title = 'BTC ' + today
-    body = {
-    'requests': [{
-        'addSheet': {
-            'properties': {
-                'title': title,
+    for coin in coins:
+        print('Getting data from {0} sheet'.format(coin))
+        result = service.spreadsheets().values().get(
+            spreadsheetId=risk_strategy_sheet_id, range='{0}!A1:E'.format(coin), valueRenderOption='FORMULA').execute()
+        current_risk_sheet = result.get('values', [])
+        print('{0} rows retrieved.'.format(len(current_risk_sheet)))
+
+        body = {
+                'values': current_risk_sheet
             }
-        }
-    }]
-    }
+            
+        # only archive btc for now
+        if coin == 'BTC':
+            print('Archiving BTC sheet')
+            today = date.today().strftime("%b-%d-%Y")
+            title = 'BTC ' + today
+            archiving_body = {
+            'requests': [{
+                'addSheet': {
+                    'properties': {
+                        'title': title,
+                    }
+                }
+            }]
+            }
 
-    # archive
-    print('Creating new sheet {}'.format(title))
-    result = service.spreadsheets().batchUpdate(
-        spreadsheetId=binance_bot_sheet_id,
-        body=body).execute()
+            # archive BTC sheet
+            print('Creating new sheet {}'.format(title))
+            result = service.spreadsheets().batchUpdate(
+                spreadsheetId=binance_bot_sheet_id,
+                body=archiving_body).execute()
 
-    body = {
-        'values': current_risk_sheet
-    }
-    print('Copying data to archived sheet')
-    result = service.spreadsheets().values().update(
-        spreadsheetId=binance_bot_sheet_id, range= title + '!A1:E',
-        valueInputOption='USER_ENTERED', body=body).execute()
-    print('{0} cells updated.'.format(result.get('updatedCells')))
+            
+            print('Copying data to archived sheet')
+            result = service.spreadsheets().values().update(
+                spreadsheetId=binance_bot_sheet_id, range= title + '!A1:E',
+                valueInputOption='USER_ENTERED', body=body).execute()
+            print('{0} cells updated.'.format(result.get('updatedCells')))
 
-    print('Updating the current sheet')
-    result = service.spreadsheets().values().update(
-        spreadsheetId=binance_bot_sheet_id, range='BTCMain!A1:E',
-        valueInputOption='USER_ENTERED', body=body).execute()
-    print('{0} cells updated.'.format(result.get('updatedCells')))
+        print('Updating the current {0} sheet'.format(coin))
+        result = service.spreadsheets().values().update(
+            spreadsheetId=binance_bot_sheet_id, range='{0}Main!A1:E'.format(coin),
+            valueInputOption='USER_ENTERED', body=body).execute()
+        print('{0} cells updated.'.format(result.get('updatedCells')))
     print('Job complete')
 
 def send_daily_email():
@@ -136,21 +144,21 @@ def send_daily_email():
     context = ssl.create_default_context()
 
     sender_email = "binancebottest92@gmail.com"
-    receiver_emails = ["donalmongey@gmail.com", "gavinbmoore96@gmail.com"]
+    receiver_emails = ["gavinbmoore96@gmail.com", "donalmongey@gmail.com"]
     message = MIMEMultipart("alternative")
     message["Subject"] = "Bot test"
     message["From"] = sender_email
-    message["To"] = receiver_email
 
-    part2 = MIMEText(html, "html")
-    message.attach(part2)
+    part1 = MIMEText(html, "html")
+    message.attach(part1)
 
     with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
         print('Logging into email server')
         server.login(sender_email, gmail_password)
         print('Sending email')
         for email_address in receiver_emails:
+            message["To"] = email_address
             server.sendmail(
-            sender_email, email_address, message.as_string()
-        )
-        print('Email sent to {0}'.format(email_address))
+                sender_email, email_address, message.as_string()
+            )
+            print('Email sent to {0}'.format(email_address))
