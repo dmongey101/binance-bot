@@ -70,17 +70,31 @@ def send_daily_email():
     client = Client(api_key, api_secret)
     client.API_URL = 'https://testnet.binance.vision/api'
 
-    coins = ['USDT', 'BTC', 'ETH']
-    balance_table_body = ''
-    balances = {}
     print('Gathering balances')
-    for coin in coins:
-        balance = client.get_asset_balance(asset=coin)
-        asset = balance.get('asset')
-        free = balance.get('free')
-        locked = balance.get('locked')
+    balance_table_body = ''
+    balances = client.get_account().get('balances')
+    for coin in balances:
+        asset = coin.get('asset')
+        free = coin.get('free')
+        locked = coin.get('locked')
         balance_table_body += '<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>'.format(asset, free, locked)
-
+    
+    print('Calculating total USDT balance')
+    values = []
+    total_usdt_balance = 0.0
+    for price in balances:
+        if price.get('free') not in ['0.00000000', '0.00'] and price.get('asset') not in ['BUSD', 'USDT']:
+            coin = price.get('asset')
+            avg_price = client.get_avg_price(symbol=coin+'USDT')
+            struct = {}
+            struct['coin'] = coin
+            struct['price'] = float(avg_price.get('price'))
+            struct['amount'] = float(price.get('free'))
+            values.append(struct)
+            total_usdt_balance += float(avg_price.get('price')) * float(price.get('free'))
+        if price.get('asset') == 'USDT':
+            total_usdt_balance += float(price.get('free'))
+    
     symbols = ['BTCUSDT', 'ETHUSDT']
     all_orders = []
     print('Gathering open orders')
@@ -103,7 +117,7 @@ def send_daily_email():
     html = """\
     <html>
     <body>
-        <h2>Balances</h2>
+        <h4>Balances</h4>
         <table border="1">
             <thead>
                 <tr>
@@ -117,7 +131,21 @@ def send_daily_email():
             </tbody>
         </table>
         <br>
-        <h2>Current Orders</h2>
+        <h4>Total USDT balance</h4>
+        <table border="1">
+            <thead>
+                <tr>
+                <th>USDT Balance</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                <td>{1}</td>
+                </tr>
+            </tbody>
+        </table>
+        <br>   
+        <h4>Current Orders</h4>
         <table border="1">
             <thead>
                 <tr>
@@ -130,12 +158,12 @@ def send_daily_email():
                 </tr>
             </thead>
             <tbody>
-                {1}
+                {2}
             </tbody>
         </table>
     </body>
     </html>
-    """.format(balance_table_body, order_table_body)
+    """.format(balance_table_body, total_usdt_balance, order_table_body)
 
 
     port = 465
@@ -144,7 +172,7 @@ def send_daily_email():
     context = ssl.create_default_context()
 
     sender_email = "binancebottest92@gmail.com"
-    receiver_emails = ["gavinbmoore96@gmail.com", "donalmongey@gmail.com"]
+    receiver_emails = ["donalmongey@gmail.com"]
     message = MIMEMultipart("alternative")
     message["Subject"] = "Bot test"
     message["From"] = sender_email
