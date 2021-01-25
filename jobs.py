@@ -13,54 +13,66 @@ load_dotenv()
 risk_strategy_sheet_id = os.getenv('RISK_STRATEGY_SHEET_ID')
 binance_bot_sheet_id = os.getenv('BINANCE_BOT_SHEET_ID')
 
+current_col = 'D'
+
 def update_sheet_job(service):
-
+    global current_col
     coins = ['BTC', 'ETH']
-
+    print('Updating Sheets')
     for coin in coins:
-        print('Getting data from {0} sheet'.format(coin))
+        if coin == 'ETH':
+            weekly_moving_avg = '!N2:N3'
+        else:
+            weekly_moving_avg = '!N9:N10'
+        ranges = [
+            coin + '!A3',
+            coin + '!N3:N4',
+            coin + weekly_moving_avg,
+            coin + '!E3:E'
+        ]
+        print('Getting values from {0} sheets'.format(coin))
+        result = service.spreadsheets().values().batchGet(
+            spreadsheetId=risk_strategy_sheet_id, ranges=ranges, valueRenderOption='FORMATTED_VALUE').execute()
+        current_risk_sheet = result.get('valueRanges', [])
+
         result = service.spreadsheets().values().get(
-            spreadsheetId=risk_strategy_sheet_id, range='{0}!A1:E'.format(coin), valueRenderOption='FORMULA').execute()
-        current_risk_sheet = result.get('values', [])
-        print('{0} rows retrieved.'.format(len(current_risk_sheet)))
+            spreadsheetId=risk_strategy_sheet_id, range=coin+'!A4:B', valueRenderOption='FORMULA').execute()
+        current_risk_sheet_prices = result.get('values', [])
 
-        body = {
-                'values': current_risk_sheet
-            }
-            
-        # only archive btc for now
-        if coin == 'BTC':
-            print('Archiving BTC sheet')
-            today = date.today().strftime("%b-%d-%Y")
-            title = 'BTC ' + today
-            archiving_body = {
-            'requests': [{
-                'addSheet': {
-                    'properties': {
-                        'title': title,
-                    }
-                }
-            }]
-            }
+        batch_update_values_request_body = {
+            # How the input data should be interpreted.
+            'value_input_option': 'USER_ENTERED',  # TODO: Update placeholder value.
 
-            # archive BTC sheet
-            print('Creating new sheet {}'.format(title))
-            result = service.spreadsheets().batchUpdate(
-                spreadsheetId=binance_bot_sheet_id,
-                body=archiving_body).execute()
+            # The new values to apply to the spreadsheet.
+            'data': [
+                {
+                    "range": 'Moving Averages - {0}!{1}2:{1}3'.format(coin, current_col),
+                    "values": current_risk_sheet[2].get('values')
+                },
+                {
+                    "range": 'Moving Averages - {0}!{1}4:{1}5'.format(coin, current_col),
+                    "values": current_risk_sheet[1].get('values')
+                },
+                {
+                    "range": 'Moving Averages - {0}!{1}7'.format(coin, current_col),
+                    "values": current_risk_sheet[0].get('values')
+                },
+                {
+                    "range": 'Moving Averages - {0}!{1}9:{1}'.format(coin, current_col),
+                    "values": current_risk_sheet[3].get('values')
+                },
+                {
+                    "range": '{0}Main!A4:B'.format(coin, current_col),
+                    "values": current_risk_sheet_prices
+                },
+            ]
+        }
+        print('Updating our {0} sheets'.format(coin))
+        request = service.spreadsheets().values().batchUpdate(
+            spreadsheetId=binance_bot_sheet_id, body=batch_update_values_request_body).execute()
 
-            
-            print('Copying data to archived sheet')
-            result = service.spreadsheets().values().update(
-                spreadsheetId=binance_bot_sheet_id, range= title + '!A1:E',
-                valueInputOption='USER_ENTERED', body=body).execute()
-            print('{0} cells updated.'.format(result.get('updatedCells')))
-
-        print('Updating the current {0} sheet'.format(coin))
-        result = service.spreadsheets().values().update(
-            spreadsheetId=binance_bot_sheet_id, range='{0}Main!A1:E'.format(coin),
-            valueInputOption='USER_ENTERED', body=body).execute()
-        print('{0} cells updated.'.format(result.get('updatedCells')))
+    current_col = chr(ord(current_col) + 1)
+    print('Next column is {0}'.format(current_col))
     print('Job complete')
 
 def send_daily_email():
@@ -190,3 +202,4 @@ def send_daily_email():
                 sender_email, email_address, message.as_string()
             )
             print('Email sent to {0}'.format(email_address))
+
