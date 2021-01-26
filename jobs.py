@@ -181,7 +181,7 @@ def send_daily_email():
     context = ssl.create_default_context()
 
     sender_email = "binancebottest92@gmail.com"
-    receiver_emails = ["donalmongey@gmail.com"]
+    receiver_emails = ["gavinbmoore96@gmail.com", "donalmongey@gmail.com"]
     message = MIMEMultipart("alternative")
     message["Subject"] = "Bot test"
     message["From"] = sender_email
