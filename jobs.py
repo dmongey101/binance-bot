@@ -13,7 +13,7 @@ load_dotenv()
 risk_strategy_sheet_id = os.getenv('RISK_STRATEGY_SHEET_ID')
 binance_bot_sheet_id = os.getenv('BINANCE_BOT_SHEET_ID')
 
-current_col = 'D'
+current_col = 'E'
 
 def update_sheet_job(service):
     global current_col
@@ -28,16 +28,13 @@ def update_sheet_job(service):
             coin + '!A3',
             coin + '!N3:N4',
             coin + weekly_moving_avg,
-            coin + '!E3:E'
+            coin + '!E3:E',
+            coin + '!A4:B'
         ]
         print('Getting values from {0} sheets'.format(coin))
         result = service.spreadsheets().values().batchGet(
-            spreadsheetId=risk_strategy_sheet_id, ranges=ranges, valueRenderOption='FORMATTED_VALUE').execute()
+            spreadsheetId=risk_strategy_sheet_id, ranges=ranges, valueRenderOption='UNFORMATTED_VALUE').execute()
         current_risk_sheet = result.get('valueRanges', [])
-
-        result = service.spreadsheets().values().get(
-            spreadsheetId=risk_strategy_sheet_id, range=coin+'!A4:B', valueRenderOption='FORMULA').execute()
-        current_risk_sheet_prices = result.get('values', [])
 
         batch_update_values_request_body = {
             # How the input data should be interpreted.
@@ -46,16 +43,16 @@ def update_sheet_job(service):
             # The new values to apply to the spreadsheet.
             'data': [
                 {
-                    "range": 'Moving Averages - {0}!{1}2:{1}3'.format(coin, current_col),
-                    "values": current_risk_sheet[2].get('values')
+                    "range": 'Moving Averages - {0}!{1}7'.format(coin, current_col),
+                    "values": current_risk_sheet[0].get('values')
                 },
                 {
                     "range": 'Moving Averages - {0}!{1}4:{1}5'.format(coin, current_col),
                     "values": current_risk_sheet[1].get('values')
                 },
                 {
-                    "range": 'Moving Averages - {0}!{1}7'.format(coin, current_col),
-                    "values": current_risk_sheet[0].get('values')
+                    "range": 'Moving Averages - {0}!{1}2:{1}3'.format(coin, current_col),
+                    "values": current_risk_sheet[2].get('values')
                 },
                 {
                     "range": 'Moving Averages - {0}!{1}9:{1}'.format(coin, current_col),
@@ -63,8 +60,8 @@ def update_sheet_job(service):
                 },
                 {
                     "range": '{0}Main!A4:B'.format(coin, current_col),
-                    "values": current_risk_sheet_prices
-                },
+                    "values": current_risk_sheet[4].get('values')
+                }
             ]
         }
         print('Updating our {0} sheets'.format(coin))
@@ -184,7 +181,7 @@ def send_daily_email():
     context = ssl.create_default_context()
 
     sender_email = "binancebottest92@gmail.com"
-    receiver_emails = ["donalmongey@gmail.com"]
+    receiver_emails = ["gavinbmoore96@gmail.com", "donalmongey@gmail.com"]
     message = MIMEMultipart("alternative")
     message["Subject"] = "Bot test"
     message["From"] = sender_email
