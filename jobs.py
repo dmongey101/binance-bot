@@ -13,24 +13,31 @@ load_dotenv()
 risk_strategy_sheet_id = os.getenv('RISK_STRATEGY_SHEET_ID')
 binance_bot_sheet_id = os.getenv('BINANCE_BOT_SHEET_ID')
 
-current_col = 'E'
+current_col = 'F'
 
 def update_sheet_job(service):
     global current_col
-    coins = ['BTC', 'ETH']
+    coins = ['BTC', 'ETH', 'LINK', 'ADA', 'LTC', 'XMR', 'VET', 'XLM', 'NEO', 'XTZ', 'DASH', 'EOS', 'TRX', 'ATOM']
     print('Updating Sheets')
     for coin in coins:
+
         if coin == 'ETH':
             weekly_moving_avg = '!N2:N3'
         else:
             weekly_moving_avg = '!N9:N10'
+        
         ranges = [
-            coin + '!A3',
-            coin + '!N3:N4',
-            coin + weekly_moving_avg,
             coin + '!E3:E',
             coin + '!A4:B'
         ]
+
+        if coin in ['BTC', 'ETH']:
+            ranges.extend([
+                coin + '!A3',
+                coin + '!N3:N4',
+                coin + weekly_moving_avg
+            ])
+
         print('Getting values from {0} sheets'.format(coin))
         result = service.spreadsheets().values().batchGet(
             spreadsheetId=risk_strategy_sheet_id, ranges=ranges, valueRenderOption='UNFORMATTED_VALUE').execute()
@@ -43,27 +50,34 @@ def update_sheet_job(service):
             # The new values to apply to the spreadsheet.
             'data': [
                 {
-                    "range": 'Moving Averages - {0}!{1}7'.format(coin, current_col),
-                    "values": current_risk_sheet[0].get('values')
-                },
-                {
-                    "range": 'Moving Averages - {0}!{1}4:{1}5'.format(coin, current_col),
-                    "values": current_risk_sheet[1].get('values')
-                },
-                {
-                    "range": 'Moving Averages - {0}!{1}2:{1}3'.format(coin, current_col),
-                    "values": current_risk_sheet[2].get('values')
-                },
-                {
-                    "range": 'Moving Averages - {0}!{1}9:{1}'.format(coin, current_col),
-                    "values": current_risk_sheet[3].get('values')
-                },
-                {
                     "range": '{0}Main!A4:B'.format(coin, current_col),
-                    "values": current_risk_sheet[4].get('values')
+                    "values": current_risk_sheet[1].get('values')
                 }
             ]
         }
+
+        if coin in ['BTC', 'ETH']:
+            batch_update_values_request_body.get('data').extend(
+                [
+                    {
+                        "range": 'Moving Averages - {0}!{1}9:{1}'.format(coin, current_col),
+                        "values": current_risk_sheet[0].get('values')
+                    },
+                    {
+                        "range": 'Moving Averages - {0}!{1}7'.format(coin, current_col),
+                        "values": current_risk_sheet[2].get('values')
+                    },
+                    {
+                        "range": 'Moving Averages - {0}!{1}4:{1}5'.format(coin, current_col),
+                        "values": current_risk_sheet[3].get('values')
+                    },
+                    {
+                        "range": 'Moving Averages - {0}!{1}2:{1}3'.format(coin, current_col),
+                        "values": current_risk_sheet[4].get('values')
+                    }
+                ]
+            )
+
         print('Updating our {0} sheets'.format(coin))
         request = service.spreadsheets().values().batchUpdate(
             spreadsheetId=binance_bot_sheet_id, body=batch_update_values_request_body).execute()

@@ -88,6 +88,7 @@ def get_current_risks(from_currency, to_currency):
 
 schedule.every().day.at("06:00").do(update_sheet_job, service)
 schedule.every().day.at("07:10").do(send_daily_email)
+update_sheet_job(service)
 
 while True:
     schedule.run_pending()

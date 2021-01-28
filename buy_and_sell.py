@@ -2,11 +2,28 @@ import os
 import math
 from binance.client import Client
 from binance.enums import *
+from geminipy import Geminipy
 
-api_key = os.getenv("BINANCE_API_KEY")
-api_secret = os.getenv("BINANCE_API_SECRET")
-client = Client(api_key, api_secret)
-client.API_URL = 'https://testnet.binance.vision/api'
+api_key = os.getenv("GEMINI_API_KEY")
+api_secret = os.getenv("GEMINI_API_SECRET")
+
+con = Geminipy(api_key=api_key, secret_key=api_secret, live=True)
+symbols = con.symbols()
+print(symbols.json())
+# api_key = os.getenv("BINANCE_API_KEY")
+# api_secret = os.getenv("BINANCE_API_SECRET")
+# client = Client(api_key, api_secret)
+# client.API_URL = 'https://testnet.binance.vision/api'
+
+
+risk_tiers = [
+    'tier1': ['ATOM', 'XTZ'],
+    'tier5': ['LINK', 'ADA', 'VET', 'EOS', 'TRX'],
+    'tier6': ['NEO'],
+    'tier7': ['ETH', 'DASH'],
+    'tier8': ['LTC'],
+    'tier9': ['BTC']
+]
 
 def sell_order(current_btc_risk, current_price, from_currency, to_currency, risk_cool_off_value):
     # this needs to be the initial amount of btc
