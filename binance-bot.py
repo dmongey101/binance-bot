@@ -87,12 +87,78 @@ def get_current_risks(from_currency, to_currency):
     return float(coin_risk[0][0])
 
 schedule.every().day.at("06:00").do(update_sheet_job, service)
-schedule.every().day.at("07:10").do(send_daily_email)
+schedule.every().day.at("07:00").do(send_daily_email)
 update_sheet_job(service)
-
+risk_tiers = [
+    {
+        'tier': '1',
+        'equation': 0.00000285 * pow(math.e, 15.5*x),
+        'mpa': 0.01,
+        'lowest_buying_risk': 0.1,
+        'next_buying_risk': 0.0,
+        'next_selling_risk': 0.0,
+        'coins': ['ATOM', 'XTZ']
+    },
+    {
+        'tier': '5',
+        'equation': 0.0000699 * pow(math.e, 9.8*x),
+        'mpa': 0.05,
+        'lowest_buying_risk': 0.225,
+        'next_buying_risk': 0.0,
+        'next_selling_risk': 0.0,
+        'coins': ['LINK', 'ADA', 'VET', 'EOS', 'TRX']
+    },
+    {
+        'tier': '6',
+        'equation': 0.000197 * pow(math.e, 8.2*x),
+        'mpa': 0.1,
+        'lowest_buying_risk': 0.3,
+        'next_buying_risk': 0.0,
+        'next_selling_risk': 0.0,
+        'coins': ['NEO']
+    },
+    {
+        'tier': '7',
+        'equation': 0.000617 * pow(math.e, 6.04*x),
+        'mpa': 0.125,
+        'lowest_buying_risk': 0.35,
+        'next_buying_risk': 0.0,
+        'next_selling_risk': 0.0,
+        'coins': ['ETH', 'DASH']
+    },
+    {
+        'tier': '8',
+        'equation': 0.00128 * pow(math.e, 5.03*x),
+        'mpa': 0.15,
+        'lowest_buying_risk': 0.4,
+        'next_buying_risk': 0.0,
+        'next_selling_risk': 0.0,
+        'coins': ['LTC']
+    },
+    {
+        'tier': '9',
+        'equation': 0.00281 * pow(math.e, 3.74*x),
+        'mpa': 0.23,
+        'lowest_buying_risk': 0.5,
+        'next_buying_risk': 0.0,
+        'next_selling_risk': 0.0,
+        'coins': ['BTC']
+    }
+]
 while True:
     schedule.run_pending()
-    current_btc_risk = get_current_risks('BTC', 'USD')
+    for tier in tiers:
+        lowest_risked_coin = tier.get('coins')[0]
+        lowest_risk = 0.00
+        for coin in tier.get('coins'):
+            current_risk = get_current_risks(coin, 'USD')
+            if current_risk < lowest_risked_coin:
+                lowest_risked_coin = coin
+                lowest_risk = current_risk
+        if lowest_risked < tier.get('lowest_buying_risk'):
+            buy_order(lowest_risked_coin, 'USDT', tier.get('equation'), tier.get('mpa'), lowest_risk)
+            tier.get('next_buying_risk') -= 0.025
+    
     print(current_price)
     if risk_cool_off_btc_value - current_btc_risk >= 0.05:
         risk_cool_off_btc_value -= 0.025

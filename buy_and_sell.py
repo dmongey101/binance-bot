@@ -29,6 +29,7 @@ def sell_order(current_btc_risk, current_price, from_currency, to_currency, risk
     # this needs to be the initial amount of btc
     btc_holding = float(client.get_asset_balance(asset=from_currency).get('free'))
     slo_div = 0.0753 + 0.0897*math.log(current_btc_risk)
+    2.81E-03e^3.74x
     slo_btc_amount = float(format(btc_holding * slo_div, ".5f"))
     slo_price = math.floor(current_price-500)
     print('Looking for previous orders')
@@ -61,12 +62,15 @@ def sell_order(current_btc_risk, current_price, from_currency, to_currency, risk
     return risk_cool_off_value
     
     
-def buy_order(from_currency, to_currency):
+def buy_order(from_currency, to_currency, equation, mpa, current_risk):
     to_currency_balance = client.get_asset_balance(asset=to_currency)
     print('Your {0} balance was {1} {2}'.format(to_currency, to_currency_balance.get('free')), to_currency)
+    x = current_risk
+    amount_to_buy = equation
+    print(amount_to_buy)
     order = client.order_market_buy(
         symbol=from_currency+to_currency,
-        quantity=0.3)
+        quantity=amount_to_buy)
     print(order)
     to_currency_balance = client.get_asset_balance(asset=to_currency)
     print('Your {0} balance is now {1} {2}'.format(to_currency, to_currency_balance.get('free')), to_currency)
