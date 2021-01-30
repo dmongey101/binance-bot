@@ -29,7 +29,6 @@ def sell_order(current_btc_risk, current_price, from_currency, to_currency, risk
     # this needs to be the initial amount of btc
     btc_holding = float(client.get_asset_balance(asset=from_currency).get('free'))
     slo_div = 0.0753 + 0.0897*math.log(current_btc_risk)
-    2.81E-03e^3.74x
     slo_btc_amount = float(format(btc_holding * slo_div, ".5f"))
     slo_price = math.floor(current_price-500)
     print('Looking for previous orders')
@@ -64,20 +63,42 @@ def sell_order(current_btc_risk, current_price, from_currency, to_currency, risk
     
 def buy_order(from_currency, to_currency, equation, mpa, current_risk):
     to_currency_balance = client.get_asset_balance(asset=to_currency)
-    print('Your {0} balance was {1} {2}'.format(to_currency, to_currency_balance.get('free')), to_currency)
-    x = current_risk
-    amount_to_buy = equation
-    print(amount_to_buy)
-    order = client.order_market_buy(
-        symbol=from_currency+to_currency,
-        quantity=amount_to_buy)
-    print(order)
-    to_currency_balance = client.get_asset_balance(asset=to_currency)
-    print('Your {0} balance is now {1} {2}'.format(to_currency, to_currency_balance.get('free')), to_currency)
-    print('You bought 0.3 ' + from_currency)
     from_currency_balance = client.get_asset_balance(asset=from_currency)
-    print('Your {0} balance is now {1} {2}'.format(from_currency, from_currency_balance.get('free'), from_currency))
-    global risk_cool_off_value
-    risk_cool_off_value += 0.025
-    risk_cool_off_value = round(risk_cool_off_value, 3)
-    print('New sell order risk is set to {}'.format(risk_cool_off_value))
+    total_usdt_balance = get_total_account_balance()
+
+    percentage_of_portfolio = from_currency_balance/total_usdt_balance
+
+    if percentage_of_portfolio > mpa:
+        print('Max portfolio allocation limit reached')
+    else:
+        print('Your {0} balance was {1} {2}'.format(to_currency, to_currency_balance.get('free')), to_currency)
+        print('Current {0} balance is {1}'.format(from_currency, from_currency_balance))
+        x = current_risk
+        amount_to_buy = equation
+        print(amount_to_buy)
+        order_amount = (total_usdt_balance * mpa) * amount_to_buy
+        order = client.order_market_buy(
+            symbol=from_currency+to_currency,
+            quantity=order_amount)
+        print(order)
+        to_currency_balance = client.get_asset_balance(asset=to_currency)
+        print('Your {0} balance is now {1} {2}'.format(to_currency, to_currency_balance.get('free')), to_currency)
+        print('You bought 0.3 ' + from_currency)
+        from_currency_balance = client.get_asset_balance(asset=from_currency)
+        print('Your {0} balance is now {1} {2}'.format(from_currency, from_currency_balance.get('free'), from_currency))
+        global risk_cool_off_value
+        risk_cool_off_value += 0.025
+        risk_cool_off_value = round(risk_cool_off_value, 3)
+        print('New sell order risk is set to {}'.format(risk_cool_off_value))
+
+def get_total_account_balance():
+    print('Calculating total USDT balance')
+    total_usdt_balance = 0.0
+    for price in balances:
+        if price.get('free') not in ['0.00000000', '0.00'] and price.get('asset') not in ['BUSD', 'USDT']:
+            coin = price.get('asset')
+            avg_price = client.get_avg_price(symbol=coin+'USDT')
+            total_usdt_balance += float(avg_price.get('price')) * float(price.get('free'))
+        if price.get('asset') == 'USDT':
+            total_usdt_balance += float(price.get('free'))
+    return total_usdt_balance

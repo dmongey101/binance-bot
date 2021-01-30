@@ -102,21 +102,7 @@ def send_daily_email():
         locked = coin.get('locked')
         balance_table_body += '<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>'.format(asset, free, locked)
     
-    print('Calculating total USDT balance')
-    values = []
-    total_usdt_balance = 0.0
-    for price in balances:
-        if price.get('free') not in ['0.00000000', '0.00'] and price.get('asset') not in ['BUSD', 'USDT']:
-            coin = price.get('asset')
-            avg_price = client.get_avg_price(symbol=coin+'USDT')
-            struct = {}
-            struct['coin'] = coin
-            struct['price'] = float(avg_price.get('price'))
-            struct['amount'] = float(price.get('free'))
-            values.append(struct)
-            total_usdt_balance += float(avg_price.get('price')) * float(price.get('free'))
-        if price.get('asset') == 'USDT':
-            total_usdt_balance += float(price.get('free'))
+    total_usdt_balance = get_total_account_balance()
     
     symbols = ['BTCUSDT', 'ETHUSDT']
     all_orders = []
@@ -213,3 +199,16 @@ def send_daily_email():
                 sender_email, email_address, message.as_string()
             )
             print('Email sent to {0}'.format(email_address))
+
+
+def get_total_account_balance():
+    print('Calculating total USDT balance')
+    total_usdt_balance = 0.0
+    for price in balances:
+        if price.get('free') not in ['0.00000000', '0.00'] and price.get('asset') not in ['BUSD', 'USDT']:
+            coin = price.get('asset')
+            avg_price = client.get_avg_price(symbol=coin+'USDT')
+            total_usdt_balance += float(avg_price.get('price')) * float(price.get('free'))
+        if price.get('asset') == 'USDT':
+            total_usdt_balance += float(price.get('free'))
+    return total_usdt_balance
