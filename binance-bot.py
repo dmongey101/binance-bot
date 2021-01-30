@@ -50,14 +50,13 @@ def get_current_price(from_currency, to_currency):
     alpha_api_key = os.getenv('ALPHA_API_KEY')
     url = alpha_base_url + 'query?function=CURRENCY_EXCHANGE_RATE&from_currency=' + from_currency + '&to_currency=' + to_currency + '&apikey=' + alpha_api_key
     response = requests.get(url).json()
+    if response is None:
+        time.sleep(60.0 - ((time.time() - starttime) % 60.0))
     return response
 
 def get_current_risks(from_currency, to_currency):
     global current_price
-
     coin_price_json = get_current_price(from_currency, to_currency)
-    if coin_price_json is None:
-        coin_price_json = get_current_price(from_currency, to_currency)
     
     current_price = float(coin_price_json.get('Realtime Currency Exchange Rate', {}).get('5. Exchange Rate'))
     current_price_time = coin_price_json.get('Realtime Currency Exchange Rate', {}).get('6. Last Refreshed')   
@@ -88,27 +87,25 @@ def get_current_risks(from_currency, to_currency):
 
 schedule.every().day.at("06:00").do(update_sheet_job, service)
 schedule.every().day.at("07:00").do(send_daily_email)
-update_sheet_job(service)
+# update_sheet_job(service)
 risk_tiers = [
-    {
-        'tier': '1',
-        'equation': 0.00000285 * pow(math.e, 15.5*x),
-        'mpa': 0.01,
-        'lowest_buying_risk': 0.1,
-        'coins': [
-            {
-                'coin': 'ATOM',
-                'next_sell_risk': 0.525
-            },
-            {
-                'coin': 'XTZ',
-                'next_sell_risk': 0.525
-            }
-        ]
-    },
+    # {
+    #     'tier': '1',
+    #     'mpa': 0.01,
+    #     'lowest_buying_risk': 0.1,
+    #     'coins': [
+    #         {
+    #             'coin': 'ATOM',
+    #             'next_sell_risk': 0.525
+    #         },
+    #         {
+    #             'coin': 'XTZ',
+    #             'next_sell_risk': 0.525
+    #         }
+    #     ]
+    # },
     {
         'tier': '5',
-        'equation': 0.0000699 * pow(math.e, 9.8*x),
         'mpa': 0.05,
         'lowest_buying_risk': 0.225,
         'coins': [
@@ -116,39 +113,37 @@ risk_tiers = [
                 'coin': 'LINK',
                 'next_sell_risk': 0.525
             },
-            {
-                'coin': 'ADA',
-                'next_sell_risk': 0.525
-            },
-            {
-                'coin': 'VET',
-                'next_sell_risk': 0.525
-            },
-            {
-                'coin': 'EOS',
-                'next_sell_risk': 0.525
-            },
-            {
-                'coin': 'TRX',
-                'next_sell_risk': 0.525
-            }
+            # {
+            #     'coin': 'ADA',
+            #     'next_sell_risk': 0.525
+            # },
+            # {
+            #     'coin': 'VET',
+            #     'next_sell_risk': 0.525
+            # },
+            # {
+            #     'coin': 'EOS',
+            #     'next_sell_risk': 0.525
+            # },
+            # {
+            #     'coin': 'TRX',
+            #     'next_sell_risk': 0.525
+            # }
         ]
     },
-    {
-        'tier': '6',
-        'equation': 0.000197 * pow(math.e, 8.2*x),
-        'mpa': 0.1,
-        'lowest_buying_risk': 0.3,
-        'coins': [
-            {
-                'coin': 'NEO',
-                'next_sell_risk': 0.525
-            }
-        ]
-    },
+    # {
+    #     'tier': '6',
+    #     'mpa': 0.1,
+    #     'lowest_buying_risk': 0.3,
+    #     'coins': [
+    #         {
+    #             'coin': 'NEO',
+    #             'next_sell_risk': 0.525
+    #         }
+    #     ]
+    # },
     {
         'tier': '7',
-        'equation': 0.000617 * pow(math.e, 6.04*x),
         'mpa': 0.125,
         'lowest_buying_risk': 0.35,
         'coins': [
@@ -156,17 +151,16 @@ risk_tiers = [
                 'coin': 'ETH',
                 'next_sell_risk': 0.525
             },
-            {
-                'coin': 'DASH',
-                'next_sell_risk': 0.525
-            }
+            # {
+            #     'coin': 'DASH',
+            #     'next_sell_risk': 0.525
+            # }
         ]
     },
     {
         'tier': '8',
-        'equation': 0.00128 * pow(math.e, 5.03*x),
         'mpa': 0.15,
-        'lowest_buying_risk': 0.4,
+        'lowest_buying_risk': 0.6,
         'coins': [
             {
                 'coin': 'LTC',
@@ -176,7 +170,6 @@ risk_tiers = [
     },
     {
         'tier': '9',
-        'equation': 0.00281 * pow(math.e, 3.74*x),
         'mpa': 0.23,
         'lowest_buying_risk': 0.5,
         'coins': [
@@ -189,12 +182,13 @@ risk_tiers = [
 ]
 while True:
     schedule.run_pending()
-    for tier in tiers:
+    for tier in risk_tiers:
         for coin in tier.get('coins'):
             current_risk = get_current_risks(coin.get('coin'), 'USD')
+            print('Current {0} is {1}'.format(coin.get('coin'), current_risk))
             if current_risk < tier.get('lowest_buying_risk'):
-                buy_order(coin.get('coin'), 'USDT', tier.get('equation'), tier.get('mpa'), current_risk)
-                coin.get('next_sell_risk') = 0.525
+                buy_order(coin.get('coin'), 'USD', tier.get('mpa'), current_risk, tier.get('tier'), current_price)
+                # coin.get('next_sell_risk') = 0.525
     # print(current_price)
     # if risk_cool_off_btc_value - current_btc_risk >= 0.05:
     #     risk_cool_off_btc_value -= 0.025
@@ -210,6 +204,5 @@ while True:
     # print('Current ETH risk: {}'.format(current_eth_risk))
     # if current_eth_risk >= risk_cool_off_eth_value:
     #     risk_cool_off_eth_value = sell_order(current_eth_risk, current_price, 'ETH', 'USDT', risk_cool_off_eth_value)
-    # print('----------------------------')
-    # I think the alpha api gets updated every minute so I'll probably change this
+    print('----------------------------')
     time.sleep(60.0 - ((time.time() - starttime) % 60.0))

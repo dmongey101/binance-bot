@@ -3,27 +3,18 @@ import math
 from binance.client import Client
 from binance.enums import *
 from geminipy import Geminipy
+from dotenv import load_dotenv
 
-api_key = os.getenv("GEMINI_API_KEY")
-api_secret = os.getenv("GEMINI_API_SECRET")
+load_dotenv()
 
-con = Geminipy(api_key=api_key, secret_key=api_secret, live=True)
-symbols = con.symbols()
-print(symbols.json())
 # api_key = os.getenv("BINANCE_API_KEY")
 # api_secret = os.getenv("BINANCE_API_SECRET")
 # client = Client(api_key, api_secret)
-# client.API_URL = 'https://testnet.binance.vision/api'
 
+api_key = os.getenv("GEMINI_SANDBOX_API_KEY")
+api_secret = os.getenv("GEMINI_SANDBOX_API_SECRET")
 
-risk_tiers = [
-    'tier1': ['ATOM', 'XTZ'],
-    'tier5': ['LINK', 'ADA', 'VET', 'EOS', 'TRX'],
-    'tier6': ['NEO'],
-    'tier7': ['ETH', 'DASH'],
-    'tier8': ['LTC'],
-    'tier9': ['BTC']
-]
+con = Geminipy(api_key=api_key, secret_key=api_secret)
 
 def sell_order(current_btc_risk, current_price, from_currency, to_currency, risk_cool_off_value):
     # this needs to be the initial amount of btc
@@ -43,6 +34,7 @@ def sell_order(current_btc_risk, current_price, from_currency, to_currency, risk
         print('Cancelled order with id {}'.format(old_order_id))
     else:
         print('No order found')
+
     print('Creating new order')
     print('Quantity: {0} {1}'.format(slo_btc_amount, from_currency))
     print('Sell Price: ${}'.format(slo_price))
@@ -60,40 +52,60 @@ def sell_order(current_btc_risk, current_price, from_currency, to_currency, risk
     print('New sell order risk is set to {}'.format(risk_cool_off_value))
     return risk_cool_off_value
     
-    
-def buy_order(from_currency, to_currency, equation, mpa, current_risk):
-    to_currency_balance = client.get_asset_balance(asset=to_currency)
-    from_currency_balance = client.get_asset_balance(asset=from_currency)
-    total_usdt_balance = get_total_account_balance()
-
-    percentage_of_portfolio = from_currency_balance/total_usdt_balance
-
+def buy_order(from_currency, to_currency, mpa, current_risk, tier, current_price):
+    total_portfolio_balance = get_total_account_balance_gemini(current_price)
+    from_currency_balance = get_balance(from_currency, True)
+    print('Total value of {0} is {1} USD'.format(from_currency, from_currency_balance))
+    to_currency_balance = get_balance(to_currency)
+    print('Total value of {0} is {1}'.format(to_currency, to_currency_balance))
+    percentage_of_portfolio = from_currency_balance/total_portfolio_balance
     if percentage_of_portfolio > mpa:
         print('Max portfolio allocation limit reached')
     else:
-        print('Your {0} balance was {1} {2}'.format(to_currency, to_currency_balance.get('free')), to_currency)
-        print('Current {0} balance is {1}'.format(from_currency, from_currency_balance))
-        x = current_risk
-        amount_to_buy = equation
+        amount_to_buy = 0.0
+        if tier == '1':
+            amount_to_buy = 0.00000285 * pow(math.e, 15.5*current_risk)
+        if tier == '5':
+            amount_to_buy = 0.0000699 * pow(math.e, 9.8*current_risk)
+        if tier == '6':
+            amount_to_buy = 0.000197 * pow(math.e, 8.2*current_risk)
+        if tier == '7':
+            amount_to_buy = 0.000617 * pow(math.e, 6.04*current_risk)
+        if tier == '8':
+            amount_to_buy = 0.00128 * pow(math.e, 5.03*current_risk)
+        if tier == '9':
+            amount_to_buy = 0.00281 * pow(math.e, 3.74*current_risk)
         print(amount_to_buy)
-        order_amount = (total_usdt_balance * mpa) * amount_to_buy
-        order = client.order_market_buy(
-            symbol=from_currency+to_currency,
-            quantity=order_amount)
-        print(order)
-        to_currency_balance = client.get_asset_balance(asset=to_currency)
-        print('Your {0} balance is now {1} {2}'.format(to_currency, to_currency_balance.get('free')), to_currency)
-        print('You bought 0.3 ' + from_currency)
-        from_currency_balance = client.get_asset_balance(asset=from_currency)
-        print('Your {0} balance is now {1} {2}'.format(from_currency, from_currency_balance.get('free'), from_currency))
-        global risk_cool_off_value
-        risk_cool_off_value += 0.025
-        risk_cool_off_value = round(risk_cool_off_value, 3)
-        print('New sell order risk is set to {}'.format(risk_cool_off_value))
+        order_amount = (total_portfolio_balance * mpa) * amount_to_buy
 
-def get_total_account_balance():
+        if order_amount > to_currency_balance:
+            order_amount = to_currency_balance
+
+        order_amount = float(format(order_amount/current_price, ".5f"))
+        print('Attempting to buy {0} {1}'.format(order_amount, from_currency))
+        # for testing only
+        try:
+            order = con.new_order(
+                amount=str(order_amount-100),
+                price=str(current_price),
+                side='buy',
+                symbol=from_currency+to_currency,
+                options=['immediate-or-cancel']
+            )
+            print(order.json())
+        except:
+            print('Order failed')
+            pass    
+        # for production only
+        # order = client.order_market_buy(
+        #     symbol=from_currency+to_currency,
+        #     quantity=order_amount)
+
+
+def get_total_account_balance_binance():
     print('Calculating total USDT balance')
     total_usdt_balance = 0.0
+    balances = client.get_account().get('balances')
     for price in balances:
         if price.get('free') not in ['0.00000000', '0.00'] and price.get('asset') not in ['BUSD', 'USDT']:
             coin = price.get('asset')
@@ -102,3 +114,26 @@ def get_total_account_balance():
         if price.get('asset') == 'USDT':
             total_usdt_balance += float(price.get('free'))
     return total_usdt_balance
+
+def get_total_account_balance_gemini(current_price):
+    print('Calculating total USD balance')
+    total_usd_balance = 0.0
+    balances = con.notionalBalances().json()
+    for coin in balances:
+        total_usd_balance += float(coin.get('availableNotional'))
+    print('Total balance is {}'.format(total_usd_balance))
+    return total_usd_balance
+
+def get_balance(currency, notional=False):
+    if notional:
+        balances = con.notionalBalances().json()
+        for balance in balances:
+            if balance.get('currency') == currency:
+                return float(balance.get('availableNotional'))
+    else:
+        balances = con.balances().json()
+        for balance in balances:
+            if balance.get('currency') == currency:
+                return float(balance.get('available'))
+    return 0.0
+

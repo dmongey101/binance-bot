@@ -13,7 +13,7 @@ load_dotenv()
 risk_strategy_sheet_id = os.getenv('RISK_STRATEGY_SHEET_ID')
 binance_bot_sheet_id = os.getenv('BINANCE_BOT_SHEET_ID')
 
-current_col = 'F'
+current_col = 'H'
 
 def update_sheet_job(service):
     global current_col
@@ -102,7 +102,7 @@ def send_daily_email():
         locked = coin.get('locked')
         balance_table_body += '<tr><td>{0}</td><td>{1}</td><td>{2}</td></tr>'.format(asset, free, locked)
     
-    total_usdt_balance = get_total_account_balance()
+    total_usdt_balance = get_total_account_balance(balances)
     
     symbols = ['BTCUSDT', 'ETHUSDT']
     all_orders = []
@@ -201,7 +201,7 @@ def send_daily_email():
             print('Email sent to {0}'.format(email_address))
 
 
-def get_total_account_balance():
+def get_total_account_balance(balances):
     print('Calculating total USDT balance')
     total_usdt_balance = 0.0
     for price in balances:
