@@ -77,7 +77,8 @@ def buy_order(from_currency, to_currency, mpa, current_risk, tier, current_price
             amount_to_buy = 0.00281 * pow(math.e, 3.74*current_risk)
         print(amount_to_buy)
         order_amount = (total_portfolio_balance * mpa) * amount_to_buy
-
+        
+        # incase usd balance is too low use max amount
         if order_amount > to_currency_balance:
             order_amount = to_currency_balance
 
@@ -136,4 +137,3 @@ def get_balance(currency, notional=False):
             if balance.get('currency') == currency:
                 return float(balance.get('available'))
     return 0.0
-

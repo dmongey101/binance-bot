@@ -50,8 +50,9 @@ def get_current_price(from_currency, to_currency):
     alpha_api_key = os.getenv('ALPHA_API_KEY')
     url = alpha_base_url + 'query?function=CURRENCY_EXCHANGE_RATE&from_currency=' + from_currency + '&to_currency=' + to_currency + '&apikey=' + alpha_api_key
     response = requests.get(url).json()
-    if response is None:
-        time.sleep(60.0 - ((time.time() - starttime) % 60.0))
+    if response.get('Realtime Currency Exchange Rate') is None:
+        print('Alpha api limit exceeded. Cooling off for 30 seconds')
+        time.sleep(30.0 - ((time.time() - starttime) % 30.0))
     return response
 
 def get_current_risks(from_currency, to_currency):
@@ -87,7 +88,7 @@ def get_current_risks(from_currency, to_currency):
 
 schedule.every().day.at("06:00").do(update_sheet_job, service)
 schedule.every().day.at("07:00").do(send_daily_email)
-# update_sheet_job(service)
+
 risk_tiers = [
     # {
     #     'tier': '1',
@@ -160,7 +161,7 @@ risk_tiers = [
     {
         'tier': '8',
         'mpa': 0.15,
-        'lowest_buying_risk': 0.6,
+        'lowest_buying_risk': 0.4,
         'coins': [
             {
                 'coin': 'LTC',

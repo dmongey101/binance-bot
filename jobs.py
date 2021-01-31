@@ -13,7 +13,7 @@ load_dotenv()
 risk_strategy_sheet_id = os.getenv('RISK_STRATEGY_SHEET_ID')
 binance_bot_sheet_id = os.getenv('BINANCE_BOT_SHEET_ID')
 
-current_col = 'H'
+current_col = 'J'
 
 def update_sheet_job(service):
     global current_col
