@@ -87,7 +87,7 @@ def get_current_risks(from_currency, to_currency):
     return float(coin_risk[0][0])
 
 schedule.every().day.at("06:00").do(update_sheet_job, service)
-schedule.every().day.at("07:00").do(send_daily_email)
+schedule.every().day.at("06:10").do(send_daily_email)
 
 risk_tiers = [
     # {
